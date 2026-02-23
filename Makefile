@@ -31,7 +31,8 @@ check-files: ## Проверить наличие всех необходимы�
 	@test -f docker-compose.dev.yml || (echo "$(RED)✗ docker-compose.dev.yml не найден$(NC)" && exit 1)
 	@test -f docker-compose.prod.yml || (echo "$(RED)✗ docker-compose.prod.yml не найден$(NC)" && exit 1)
 	@test -f .env || (echo "$(RED)✗ .env не найден. Убедитесь, что вы настроили проект Laravel$(NC)" && exit 1)
-	@test -f docker/php.Dockerfile || (echo "$(RED)✗ docker/php.Dockerfile не найден$(NC)" && exit 1)
+	@test -f docker/php.mysql.Dockerfile || (echo "$(RED)✗ docker/php.mysql.Dockerfile не найден$(NC)" && exit 1)
+	@test -f docker/php.pgsql.Dockerfile || (echo "$(RED)✗ docker/php.pgsql.Dockerfile не найден$(NC)" && exit
 	@test -f docker/httpd.Dockerfile || (echo "$(RED)✗ docker/httpd.Dockerfile не найден$(NC)" && exit 1)
 	@test -f docker/httpd/conf/httpd.conf || (echo "$(RED)✗ docker/httpd/conf/httpd.conf не найден$(NC)" && exit 1)
 	@test -f docker/php/php.ini || (echo "$(RED)✗ docker/php/php.ini не найден$(NC)" && exit 1)
@@ -143,7 +144,7 @@ permissions: ## Исправить права доступа для Laravel (sto
 	$(COMPOSE) exec $(PHP_SERVICE) sh -c "if [ -d storage ]; then chown -R www-data:www-data storage bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache; fi"
 	@echo "$(GREEN)✓ Права доступа исправлены$(NC)"
 
-cleanup-httpd: ## Удалить .htaccess (не нужен для Nginx)
+cleanup-httpd: ## Удалить .htaccess (не используется с Httpd при AllowOverride None)
 	@echo "$(YELLOW)Удаление .htaccess (не используется с Httpd)...$(NC)"
 	@if [ -f public/.htaccess ]; then \
 		rm public/.htaccess && echo "$(GREEN)✓ .htaccess удален$(NC)"; \
