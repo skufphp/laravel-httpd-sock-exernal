@@ -1,4 +1,4 @@
-# Laravel Boilerplate (PHP-FPM + Httpd Unix Socket + PostgreSQL + Redis)
+# Laravel Boilerplate (PHP-FPM + Httpd Unix Socket + External PostgreSQL + External Redis Cluster)
 
 Этот репозиторий представляет собой **универсальный boilerplate** для развертывания Laravel-проектов с использованием высокопроизводительной связки сервисов через **Unix Sockets**.
 

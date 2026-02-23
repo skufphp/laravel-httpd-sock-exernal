@@ -36,40 +36,9 @@ services:
         npm run dev -- --host 0.0.0.0 --port 5173
       '
     ports:
-      - "${VITE_PORT:-5173}:5173"
+      - "5173:5173"
     networks:
       - laravel-httpd-socket-network
-
-  # Только для разработки: проброс портов PostgreSQL и Redis наружу
-  laravel-postgres-httpd-socket:
-    ports:
-      - "${DB_FORWARD_PORT}:5432"
-
-  laravel-redis-httpd-socket:
-    ports:
-      - "${REDIS_FORWARD_PORT}:6379"
-
-  # Только для разработки: интерфейс управления БД (pgAdmin)
-  laravel-pgadmin-httpd-socket:
-    image: dpage/pgadmin4:latest
-    container_name: laravel-pgadmin-httpd-socket
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-    ports:
-      - "${PGADMIN_PORT}:80"
-    networks:
-      - laravel-httpd-socket-network
-    healthcheck:
-      test: [ "CMD", "wget", "-q", "-O", "-", "http://localhost/" ]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 10s
-    depends_on:
-      laravel-postgres-httpd-socket:
-        condition: service_healthy
 
 volumes:
   node_modules:
