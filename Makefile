@@ -18,9 +18,6 @@ COMPOSE = $(COMPOSE_DEV)
 # Сервисы (имена сервисов из compose-файлов)
 PHP_SERVICE=laravel-php-httpd-socket
 HTTPD_SERVICE=laravel-httpd-socket
-POSTGRES_SERVICE=laravel-postgres-httpd-socket
-REDIS_SERVICE=laravel-redis-httpd-socket
-PGADMIN_SERVICE=laravel-pgadmin-httpd-socket
 NODE_SERVICE=laravel-node-httpd-socket
 
 help: ## Показать справку
@@ -70,17 +67,8 @@ logs-php: ## Просмотр логов PHP-FPM
 logs-httpd: ## Просмотр логов Httpd
 	$(COMPOSE) logs -f $(HTTPD_SERVICE)
 
-logs-postgres: ## Просмотр логов PostgreSQL
-	$(COMPOSE) logs -f $(POSTGRES_SERVICE)
-
-logs-pgadmin: ## Просмотр логов pgAdmin
-	$(COMPOSE) logs -f $(PGADMIN_SERVICE)
-
 logs-node: ## Просмотр логов Node (HMR)
 	$(COMPOSE) logs -f $(NODE_SERVICE)
-
-logs-redis: ## Просмотр логов Redis
-	$(COMPOSE) logs -f $(REDIS_SERVICE)
 
 status: ## Статус контейнеров
 	$(COMPOSE) ps
@@ -94,24 +82,10 @@ shell-httpd: ## Подключиться к контейнеру Httpd
 shell-node: ## Подключиться к контейнеру Node
 	$(COMPOSE) exec $(NODE_SERVICE) sh
 
-shell-postgres: ## Подключиться к PostgreSQL CLI
-	@echo "$(YELLOW)Подключение к базе...$(NC)"
-	@DB_USER=$$(grep '^DB_USERNAME=' .env | cut -d '=' -f 2- | tr -d '[:space:]'); \
-	DB_NAME=$$(grep '^DB_DATABASE=' .env | cut -d '=' -f 2- | tr -d '[:space:]'); \
-	$(COMPOSE) exec $(POSTGRES_SERVICE) psql -U $$DB_USER -d $$DB_NAME
-
-shell-redis: ## Подключиться к Redis CLI
-	@echo "$(YELLOW)Подключение к Redis...$(NC)"
-	$(COMPOSE) exec $(REDIS_SERVICE) redis-cli ping
-
 # --- Команды Laravel ---
 setup: ## Полная инициализация проекта с нуля
 	@make build
 	@make up
-	@echo "$(YELLOW)Ожидание готовности PostgreSQL...$(NC)"
-	@$(COMPOSE) exec $(POSTGRES_SERVICE) sh -c 'until pg_isready; do sleep 1; done'
-	@echo "$(YELLOW)Ожидание готовности Redis...$(NC)"
-	@$(COMPOSE) exec $(REDIS_SERVICE) sh -c 'until redis-cli ping | grep -q PONG; do sleep 1; done'
 	@make install-deps
 	@make artisan CMD="key:generate"
 	@make migrate
@@ -176,36 +150,6 @@ cleanup-httpd: ## Удалить .htaccess (не нужен для Nginx)
 	else \
 		echo "$(GREEN)✓ .htaccess уже отсутствует$(NC)"; \
 	fi
-
-info: ## Показать информацию о проекте
-	@echo "$(YELLOW)Laravel-Httpd-Socket Development Environment$(NC)"
-	@echo "======================================"
-	@echo "$(GREEN)Сервисы:$(NC)"
-	@echo "  • PHP-FPM 8.5 (Alpine)"
-	@echo "  • Httpd"
-	@echo "  • PostgreSQL 18.2"
-	@echo "  • Redis"
-	@echo "  • pgAdmin 4 (dev only)"
-	@echo ""
-	@echo "$(GREEN)Структура:$(NC)"
-	@echo "  • docker/           - Dockerfiles и конфиги сервисов"
-	@echo "  • .env              - единый файл настроек (Laravel + Docker)"
-	@echo ""
-	@echo "$(GREEN)Порты:$(NC)"
-	@echo "  • 80   - Httpd (Web Server)"
-	@echo "  • 5432 - PostgreSQL (dev forwarded)"
-	@echo "  • 6379 - Redis (dev forwarded)"
-	@echo "  • 8080 - pgAdmin (dev only)"
-	@echo "  • Unix Socket - Связь PHP-FPM <-> Httpd"
-
-validate: ## Проверить доступность сервисов по HTTP
-	@echo "$(YELLOW)Проверка работы сервисов...$(NC)"
-	@echo -n "Httpd (http://localhost): "
-	@curl -s -o /dev/null -w "%{http_code}" http://localhost && echo " $(GREEN)✓$(NC)" || echo " $(RED)✗$(NC)"
-	@echo -n "pgAdmin (http://localhost:8080): "
-	@curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 && echo " $(GREEN)✓$(NC)" || echo " $(RED)✗$(NC)"
-	@echo "$(YELLOW)Статус контейнеров:$(NC)"
-	@$(COMPOSE) ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 
 clean: ## Удалить контейнеры и тома
 	$(COMPOSE) down -v
