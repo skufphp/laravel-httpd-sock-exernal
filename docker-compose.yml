@@ -3,7 +3,7 @@ services:
   laravel-php-httpd-socket:
     build:
       context: ./docker
-      dockerfile: docker/php.mysql.Dockerfile
+      dockerfile: php.mysql.Dockerfile
       target: php-base
     container_name: laravel-php-httpd-socket
     restart: unless-stopped

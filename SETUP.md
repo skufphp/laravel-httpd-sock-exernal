@@ -1,6 +1,6 @@
 # Инструкция по установке Laravel Boilerplate
 
-Этот boilerplate предназначен для быстрого развертывания Laravel-проекта с архитектурой **PHP-FPM + Httpd (Unix socket) + PostgreSQL + Redis + pgAdmin**.
+Этот boilerplate предназначен для быстрого развертывания Laravel-проекта с архитектурой **PHP-FPM + Httpd (Unix socket) + MySQL/PostgreSQL + Redis**.
 
 ## Для каких приложений подходит эта архитектура
 
@@ -56,7 +56,22 @@ composer create-project laravel/laravel .
 * Файлы `docker-compose.yml`, `docker-compose.dev.yml`, `docker-compose.prod.yml`
 * Файл `Makefile`
 
-### 3. Настройка окружения (.env)
+### 3. Выбор базы данных (MySQL / PostgreSQL)
+В папке `docker/` подготовлено два варианта Docker-файлов для PHP с соответствующими драйверами:
+* `php.mysql.Dockerfile` — для работы с MySQL / MariaDB.
+* `php.pgsql.Dockerfile` — для работы с PostgreSQL.
+
+По умолчанию в `docker-compose.yml` используется MySQL. Чтобы переключиться на PostgreSQL, откройте `docker-compose.yml` и измените значение `dockerfile` в секции `build` сервиса `laravel-php-httpd-socket`:
+
+```yaml
+services:
+  laravel-php-httpd-socket:
+    build:
+      context: ./docker
+      dockerfile: php.pgsql.Dockerfile # Замените php.mysql.Dockerfile на php.pgsql.Dockerfile
+```
+
+### 4. Настройка окружения (.env)
 Откройте созданный файл `.env` в корне Laravel и добавьте в его конец следующую секцию из файла `.env.docker`:
 
 ```dotenv
@@ -78,8 +93,7 @@ XDEBUG_START=no
 XDEBUG_CLIENT_HOST=host.docker.internal
 ```
 
-**Важно:** 
-1. В секции БД (в начале `.env`) обязательно замените `DB_HOST=127.0.0.1` на имя сервиса из `docker-compose.yml` (например, `laravel-postgres-httpd-socket`).
+1. В секции БД (в начале `.env`) обязательно замените `DB_HOST=127.0.0.1` на адрес вашего сервера БД.
 2. Вы можете изменить имена сервисов, имя базы данных, а также все логины и пароли на свои собственные в файлах `docker-compose.yml` и `.env`.
 
 ### 4. Инициализация проекта
@@ -87,8 +101,6 @@ XDEBUG_CLIENT_HOST=host.docker.internal
 ```bash
 make setup
 ```
-
 После завершения проект будет доступен по адресу: **http://localhost**
-Интерфейс pgAdmin доступен по адресу: **http://localhost:8080**
 
 
