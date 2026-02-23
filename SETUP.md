@@ -71,6 +71,37 @@ services:
       dockerfile: php.pgsql.Dockerfile # Замените php.mysql.Dockerfile на php.pgsql.Dockerfile
 ```
 
+#### Важно: при переключении БД нужно поменять ещё и сети в `docker-compose.yml`
+В этом boilerplate окружения БД подключаются через внешние Docker-сети. Поэтому при смене БД недостаточно заменить только `dockerfile` — нужно также:
+
+1. В сервисе `laravel-php-httpd-socket` в `networks:` оставить **только** сеть нужной БД:
+   ```yaml
+   services:
+     laravel-php-httpd-socket:
+       networks:
+         - laravel-httpd-socket-network
+         # При переключении БД меняйте сеть на нужную:
+         - postgres-dev-network
+         # - mysql-dev-network
+       healthcheck:
+   ```
+
+2. В нижней секции `networks:` оставить (или раскомментировать) определение нужной сети, а ненужную — удалить/закомментировать:
+   ```yaml
+   networks:
+     laravel-httpd-socket-network:
+       driver: bridge
+
+     redis-cluster-dev:
+       external: true
+
+     postgres-dev-network:
+       external: true
+
+     mysql-dev-network:
+       external: true
+   ```
+
 ### 4. Настройка окружения (.env)
 Откройте созданный файл `.env` в корне Laravel и добавьте в его конец следующую секцию из файла `.env.docker`:
 

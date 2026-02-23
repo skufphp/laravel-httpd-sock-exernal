@@ -17,7 +17,9 @@ services:
       - unix-socket:/var/run/php
     networks:
       - laravel-httpd-socket-network
-      - mysql-dev-network
+      # При переключении БД меняйте сеть на нужную:
+      - postgres-dev-network
+      # - mysql-dev-network
     healthcheck:
       # Проверка доступности FPM через сокет
       test:
@@ -60,6 +62,9 @@ networks:
     driver: bridge
 
   redis-cluster-dev:
+    external: true
+
+  postgres-dev-network:
     external: true
 
   mysql-dev-network:

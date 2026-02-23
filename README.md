@@ -32,7 +32,9 @@
     ```bash
     cp .env.example .env
     ```
-    *(Убедитесь, что параметры БД и Redis в `.env` соответствуют именам сервисов в docker-compose).*
+    *(Убедитесь, что параметры БД и Redis в `.env` соответствуют именам сервисов в docker-compose).* 
+    
+    **Важно про переключение БД (MySQL / PostgreSQL):** помимо выбора нужного `docker/php.*.Dockerfile`, при смене БД нужно также отредактировать `docker-compose.yml` — в сервисе `laravel-php-httpd-socket` оставить только сеть нужной БД (например, `postgres-dev-network` **или** `mysql-dev-network`) и в секции `networks:` ниже оставить/подключить соответствующую сеть.
 3.  Запустите полную инициализацию:
     ```bash
     make setup
