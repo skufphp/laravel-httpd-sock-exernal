@@ -1,0 +1,28 @@
+services:
+  # Настройки PHP для Production (использование образов из Registry)
+  laravel-php-httpd-socket:
+    image: "${CI_REGISTRY_IMAGE}/php:${IMAGE_TAG}"
+    restart: unless-stopped
+    env_file:
+      - .env
+
+  # Настройки Httpd для Production
+  laravel-httpd-socket:
+    image: "${CI_REGISTRY_IMAGE}/httpd:${IMAGE_TAG}"
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+
+  # Сервис для автоматического запуска миграций при деплое
+  migrate:
+    image: "${CI_REGISTRY_IMAGE}/php:${IMAGE_TAG}"
+    restart: "no"
+    working_dir: /var/www/laravel
+    env_file:
+      - .env
+    command: [ "sh", "-lc", "php artisan migrate --force" ]
+    depends_on:
+      laravel-postgres-httpd-socket:
+        condition: service_healthy
+    networks:
+      - laravel-httpd-socket-network

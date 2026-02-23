@@ -1,0 +1,98 @@
+services:
+  # Основной контейнер Laravel PHP-FPM
+  laravel-php-httpd-socket:
+    build:
+      context: ./docker
+      dockerfile: php.Dockerfile
+      target: php-base
+    container_name: laravel-php-httpd-socket
+    restart: unless-stopped
+    working_dir: /var/www/laravel
+    environment:
+      XDEBUG_MODE: ${XDEBUG_MODE}
+      XDEBUG_START: ${XDEBUG_START}
+      XDEBUG_CLIENT_HOST: ${XDEBUG_CLIENT_HOST}
+    volumes:
+      # Общий том для UNIX-сокета (связь с HTTPD)
+      - unix-socket:/var/run/php
+    networks:
+      - laravel-httpd-socket-network
+    healthcheck:
+      # Проверка доступности FPM через сокет
+      test:
+        [
+          "CMD-SHELL",
+          "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect /var/run/php/php-fpm.sock | grep -q 'pong'"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Веб-сервер Httpd (Proxy)
+  laravel-httpd-socket:
+    build:
+      context: ./docker
+      dockerfile: httpd.Dockerfile
+    container_name: laravel-httpd-socket
+    restart: unless-stopped
+    volumes:
+      # Подключаем тот же том с сокетом
+      - unix-socket:/var/run/php
+    networks:
+      - laravel-httpd-socket-network
+    healthcheck:
+      test: [ "CMD", "httpd", "-t" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      laravel-php-httpd-socket:
+        condition: service_healthy
+
+  # База данных PostgreSQL
+  laravel-postgres-httpd-socket:
+    image: postgres:18.2-alpine
+    container_name: laravel-postgres-httpd-socket
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks:
+      - laravel-httpd-socket-network
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Хранилище данных Redis
+  laravel-redis-httpd-socket:
+    image: redis:8.6-alpine
+    container_name: laravel-redis-httpd-socket
+    restart: unless-stopped
+    command: [ "redis-server", "--appendonly", "yes" ]
+    volumes:
+      - redis-data:/data
+    networks:
+      - laravel-httpd-socket-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  unix-socket:
+  postgres-data:
+  redis-data:
+
+networks:
+  laravel-httpd-socket-network:
+    driver: bridge
