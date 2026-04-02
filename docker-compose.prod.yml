@@ -1,25 +1,160 @@
+x-laravel-env: &laravel-env
+  APP_NAME: ${APP_NAME}
+  APP_ENV: ${APP_ENV}
+  APP_DEBUG: ${APP_DEBUG}
+  APP_KEY: ${APP_KEY}
+  APP_URL: ${APP_URL}
+  APP_BASE_PATH: ${APP_BASE_PATH}
+  APP_LOCALE: ${APP_LOCALE}
+  APP_FALLBACK_LOCALE: ${APP_FALLBACK_LOCALE}
+  APP_FAKER_LOCALE: ${APP_FAKER_LOCALE}
+
+  LOG_CHANNEL: ${LOG_CHANNEL}
+  LOG_STACK: ${LOG_STACK}
+  LOG_LEVEL: ${LOG_LEVEL}
+
+  DB_CONNECTION: ${DB_CONNECTION}
+  DB_HOST: ${DB_HOST}
+  DB_PORT: ${DB_PORT}
+  DB_DATABASE: ${DB_DATABASE}
+  DB_USERNAME: ${DB_USERNAME}
+  DB_PASSWORD: ${DB_PASSWORD}
+
+  SESSION_DRIVER: ${SESSION_DRIVER}
+  SESSION_LIFETIME: ${SESSION_LIFETIME}
+  SESSION_ENCRYPT: ${SESSION_ENCRYPT}
+  SESSION_PATH: ${SESSION_PATH}
+  SESSION_DOMAIN: ${SESSION_DOMAIN}
+
+  CACHE_STORE: ${CACHE_STORE}
+  QUEUE_CONNECTION: ${QUEUE_CONNECTION}
+  BROADCAST_CONNECTION: ${BROADCAST_CONNECTION}
+  FILESYSTEM_DISK: ${FILESYSTEM_DISK}
+
+  REDIS_CLIENT: ${REDIS_CLIENT}
+  REDIS_HOST: ${REDIS_HOST}
+  REDIS_PORT: ${REDIS_PORT}
+  REDIS_PASSWORD: ${REDIS_PASSWORD}
+
 services:
-  # Настройки PHP для Production (использование образов из Registry)
-  laravel-php-httpd-socket:
-    image: "${CI_REGISTRY_IMAGE}/php:${IMAGE_TAG}"
+  # Настройки PHP для Production
+  laravel-php-apache-uds-core:
+    build:
+      context: .
+      dockerfile: docker/php.Dockerfile
+      target: production
+    image: laravel-php-apache-uds-core:latest
+    pull_policy: never
+    container_name: laravel-php-apache-uds-core
     restart: unless-stopped
-    env_file:
-      - .env
-
-  # Настройки Httpd для Production
-  laravel-httpd-socket:
-    image: "${CI_REGISTRY_IMAGE}/httpd:${IMAGE_TAG}"
-    restart: unless-stopped
-    ports:
-      - "8000:80"
-
-  # Сервис для автоматического запуска миграций при деплое
-  migrate:
-    image: "${CI_REGISTRY_IMAGE}/php:${IMAGE_TAG}"
-    restart: "no"
+    environment:
+      <<: *laravel-env
+    volumes:
+      - unix-socket:/var/run/php
     working_dir: /var/www/laravel
-    env_file:
-      - .env
-    command: [ "sh", "-lc", "php artisan migrate --force" ]
+    command: >
+      sh -c "
+        php artisan optimize:clear &&
+        php artisan migrate --force &&
+        exec php-fpm -F
+      "
     networks:
-      - laravel-httpd-socket-network
+      - laravel-apache-uds-core-network
+      - postgres-dev-network
+      - mysql-dev-network
+      - redis
+    healthcheck:
+      # Проверка доступности FPM через сокет
+      test:
+        [
+          "CMD-SHELL",
+          "SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect /var/run/php/php-fpm.sock | grep -q 'pong'"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Веб-сервер Apache (Proxy)
+  laravel-apache-uds-core:
+    build:
+      context: .
+      dockerfile: docker/httpd.Dockerfile
+      target: production
+    image: laravel-apache-uds-core:latest
+    pull_policy: never
+    container_name: laravel-apache-uds-core
+    restart: unless-stopped
+    volumes:
+      - unix-socket:/var/run/php
+    networks:
+      - laravel-apache-uds-core-network
+    depends_on:
+      laravel-php-apache-uds-core:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost/ > /dev/null 2>&1 || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Laravel Queue Worker — обработка фоновых задач
+  laravel-queue-apache-uds-core:
+    image: laravel-php-apache-uds-core:latest
+    container_name: laravel-queue-apache-uds-core
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      <<: *laravel-env
+    working_dir: /var/www/laravel
+    command: [ "php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600", "--memory=256", "--max-jobs=1000" ]
+    networks:
+      - laravel-apache-uds-core-network
+      - postgres-dev-network
+      - mysql-dev-network
+      - redis
+    depends_on:
+      laravel-php-apache-uds-core:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "ps aux | grep -v grep | grep 'queue:work' >/dev/null || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # Laravel Scheduler — запуск периодических задач (cron)
+  laravel-scheduler-apache-uds-core:
+    image: laravel-php-apache-uds-core:latest
+    container_name: laravel-scheduler-apache-uds-core
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      <<: *laravel-env
+    working_dir: /var/www/laravel
+    command: [ "php", "artisan", "schedule:work" ]
+    networks:
+      - laravel-apache-uds-core-network
+      - postgres-dev-network
+      - mysql-dev-network
+      - redis
+    depends_on:
+      laravel-php-apache-uds-core:
+        condition: service_healthy
+
+volumes:
+  unix-socket:
+
+networks:
+  laravel-apache-uds-core-network:
+    driver: bridge
+
+  redis:
+    external: true
+
+  postgres-dev-network:
+    external: true
+
+  mysql-dev-network:
+    external: true
